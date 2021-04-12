@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using API.Data;
 using API.DTOs;
 using API.Entities;
+using API.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,15 +13,17 @@ namespace API.Controllers
     public class AccountController : BaseApiController
     {
         private readonly DataContext _context;
-        public AccountController(DataContext context)
+        private readonly ITokenService _tokenService;
+        public AccountController(DataContext context, ITokenService tokenService)
         {
+            _tokenService = tokenService;
             _context = context;
         }
 
         [HttpPost("register")]
-        public async Task<ActionResult<AppUser>> Register(RegisterDto registerDto)
+        public async Task<ActionResult<UserDto>> Register(RegisterDto registerDto)
         {
-            if(await UserExists(registerDto.Username)) return BadRequest("This Username is taken");
+            if (await UserExists(registerDto.Username)) return BadRequest("This Username is taken");
 
             using var hmac = new HMACSHA512();
             var user = new AppUser
@@ -32,27 +35,35 @@ namespace API.Controllers
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
-            return user;
+            return new UserDto
+            {
+                Username = user.UserName,
+                Token = _tokenService.CreateToken(user)
+            };
         }
 
         [HttpPost("login")]
-        public async Task<ActionResult<AppUser>> Login(LoginDto loginDto)
+        public async Task<ActionResult<UserDto>> Login(LoginDto loginDto)
         {
-            var userFromDB = 
+            var userFromDB =
                 await _context.Users.SingleAsync(u => u.UserName == loginDto.Username.ToLower());
 
-            if(userFromDB is null) return Unauthorized("Invalid username");
+            if (userFromDB is null) return Unauthorized("Invalid username");
 
             using var hmac = new HMACSHA512(userFromDB.PasswordSalt);
 
             var computedHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(loginDto.Password));
 
-            for(int i = 0; i < computedHash.Length; i++)
+            for (int i = 0; i < computedHash.Length; i++)
             {
-                if(computedHash[i] != userFromDB.PasswordHash[i]) return Unauthorized("Invalid password");
+                if (computedHash[i] != userFromDB.PasswordHash[i]) return Unauthorized("Invalid password");
             }
 
-            return userFromDB;
+            return new UserDto
+            {
+                Username = userFromDB.UserName,
+                Token = _tokenService.CreateToken(userFromDB)
+            };
         }
 
         private async Task<bool> UserExists(string username)
