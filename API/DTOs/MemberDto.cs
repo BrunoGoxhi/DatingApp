@@ -6,7 +6,9 @@ namespace API.DTOs
     public class MemberDto
     {
         public int Id { get; set; }
-        public string UserName { get; set; }
+        public string Username { get; set; }
+        public string PhotoUrl { get; set; }
+        public string Age { get; set; }
         public DateTime DateOfBirth { get; set; }
         public string KnowsAs { get; set; }
         public DateTime Created { get; set; } 
