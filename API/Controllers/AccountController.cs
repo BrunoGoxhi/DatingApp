@@ -7,6 +7,7 @@ using API.Entities;
 using API.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Linq;
 
 namespace API.Controllers
 {
@@ -46,7 +47,9 @@ namespace API.Controllers
         public async Task<ActionResult<UserDto>> Login(LoginDto loginDto)
         {
             var userFromDB =
-                await _context.Users.SingleOrDefaultAsync(u => u.UserName == loginDto.Username.ToLower());
+                await _context.Users
+                .Include(p => p.Photos)
+                .SingleOrDefaultAsync(u => u.UserName == loginDto.Username.ToLower());
 
             if (userFromDB is null) return Unauthorized("Invalid username");
 
@@ -62,7 +65,8 @@ namespace API.Controllers
             return new UserDto
             {
                 Username = userFromDB.UserName,
-                Token = _tokenService.CreateToken(userFromDB)
+                Token = _tokenService.CreateToken(userFromDB),
+                PhotoUrl = userFromDB.Photos.FirstOrDefault(x => x.IsMain)?.Url
             };
         }
 
